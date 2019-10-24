@@ -1,0 +1,233 @@
+---
+title: "homework-2"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{homework-2}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+options(mc.cores = 2)
+library(casl)
+```
+
+
+
+##1. CASL 2.11 Problem #5
+
+**Consider the regression model with a scalar *x* and intercept:**
+$$
+y = \beta_0 + \beta_1 * x
+$$
+**Using the explicit formula for the inverse of a 2-by-2 matrix, write down the least squares estimators for $\hat{\beta_0}$ and $\hat{\beta_1}$.**
+
+We can express the model in matrix form, $Y = X\beta$, where each term is represented by the following matrices:
+$$
+\mathbf{Y}_{n \times p} = \left[\begin{array}
+{ccc}
+y_{1} \\
+y_{2}  \\
+...  \\
+y_{n}  \\
+\end{array}\right] \hspace{1cm}
+\mathbf{X}_{n \times p} = \left[\begin{array}
+{ccc}
+1 & x_{1}\\
+1 & x_{2}  \\
+...  & ...\\
+1 & x_{n}  \\
+\end{array}\right] \hspace{1cm}
+\mathbf{\beta} = \left[\begin{array}
+{ccc}
+\beta_{0} \\
+\beta_{1}  \\
+\end{array}\right]
+$$
+
+
+We can solve directly for $\beta$:
+$$
+\beta = (X'X)^{-1}X'Y
+$$
+Writing X'X out explicity: 
+$$
+X'X = \mathbf{X}_{n \times p} = \left[\begin{array}
+{ccc}
+n & \sum x_i \\
+\sum x_i & \sum x_i^2  \\
+\end{array}\right]
+$$
+
+We can take the inverse of the above matrix using the following formula: 
+$$
+A = \left[\begin{array}
+{ccc}
+a & b \\
+c & d  \\
+\end{array}\right] \hspace{1cm} 
+
+A' = \frac{1}{ad-bc}\left[\begin{array}
+{ccc}
+d & -b \\
+-c & a  \\
+\end{array}\right] 
+$$
+
+The inverse of $X'X$ is:
+
+$$
+(X'X)^{-1} = \frac{1}{n \sum x_i^2 - (\sum x_i)^2}\left[\begin{array}
+{ccc}
+\sum x_i^2 & -\sum x_i \\
+-\sum x_i & n  \\
+\end{array}\right]
+$$
+The cross product gives us:
+$$
+X'Y = \left[\begin{array}
+{ccc}
+1 & 1 & ... & 1 \\
+x_1 & x_2 & ... & x_n  \\
+\end{array}\right] \left[\begin{array}
+{ccc}
+y_1 \\
+y_2 \\
+... \\
+y_n \\
+\end{array}\right]=\left[\begin{array}
+{ccc}
+\sum y_i \\
+\sum x_i y_i  \\
+\end{array}\right]
+$$
+
+And then we combine the two previous formulas: 
+$$
+\beta = \frac{1}{n \sum x_i^2 - (\sum x_i)^2}\left[\begin{array}
+{ccc}
+\sum x_i^2 & -\sum x_i) \\
+-\sum x_i & n  \\
+\end{array}\right]\left[\begin{array}
+{ccc}
+\sum y_i \\
+\sum x_i y_i  \\
+\end{array}\right]
+$$
+Which gives us the explicit formula for the $\beta$:
+$$
+= \frac{1}{n \sum x_i^2 - (\sum x_i)^2}\left[\begin{array}
+{ccc}
+\sum x_i^2 \sum y_i - \sum x_i \sum x_i y_i \\
+-\sum x_i \sum y_i + n \sum x_i y_i  \\
+\end{array}\right]
+$$
+
+##2. Create a ridge regression function that accounts for collinearity: 
+
+The function `ridge_regression` returns a list of $\beta$ coefficients that accounts for collinearity.  
+
+```{r}
+data("iris")
+iris$duplicate <- iris$Sepal.Width
+ridge_regression(Sepal.Length ~ ., iris, lambda = 0)
+```
+
+##3. Cross Validation for `ridge_regression` to optimize the ridge parameter. 
+
+The function `cross_validation` returns (1) a tibble with the RMSEs, standard error of the means, and confidence interval bounds (2) a plot of the lambda values tested and their corresponding RMSEs and (3) `lambda_min`, the lambda value with the lowest RMSE 
+
+```{r}
+data("iris")
+cross_validation(Sepal.Length ~ ., iris)
+```
+
+
+##4. Section 2.8 of CASL shows that as the numerical stability decreases, statistical errors increase. Reproduce
+the results and then show that using ridge regression can increase numerical stability and decrease
+statistical error.
+
+The following code returns the condition number of a $40 \times 25$ matrix of random values by taking the ratio of the max and min singular values--which shows us that when the condition number is low, the error in estimating beta will also be low. 
+
+```{r}
+n <- 1000; p <- 25
+beta <- c(1, rep(0, p-1))
+X  <- matrix(rnorm(n * p), ncol = p)
+svals <- svd(X)$d
+max(svals)/min(svals)
+N <- 1e4; `12_errors` <- rep(0, N)
+for (k in 1:N){
+  y <- X %*% beta + rnorm(n)
+  betahat <- casl_ols_svd(X, y)
+  `12_errors`[k] <- sqrt(sum((betahat - beta)^2))
+}
+mean(`12_errors`)
+```
+
+Changing X so that one of its columns is a linear combination of one of the others increases the condition number and the corresponding error associated with the $\beta$ estimate.
+
+```{r}
+n <- 1000; p <- 25
+beta <- c(1, rep(0, p-1))
+X  <- matrix(rnorm(n * p), ncol = p)
+alpha <- 0.001
+X[,1] <- X[,1] * alpha + X[,2] * (1 - alpha)
+svals <- svd(X)$d
+max(svals) / min(svals)
+```
+
+
+```{r}
+N <- 1e4; `12_errors` <- rep(0, N)
+for (k in 1:N){
+  y <- X %*% beta + rnorm(n)
+  betahat <- solve(crossprod(X), crossprod(X,y))
+  `12_errors`[k] <- sqrt(sum((betahat - beta)^2))
+}
+mean(`12_errors`)
+```
+
+The error in the estimate is lower than the condition number, because the condition number is a poor approximate.
+
+We can also increase numerical stability and improve the accuracy of our estimate with a ridge regression. Taking the gradient of the ridge regression formula and solving directly for beta and the condition number, the new matrix we need to invert is: $X'X + 1_p \cdot \lambda$, and the corresponding condition number is: $\frac{\sigma_{max} + \lambda}{\sigma_{min} + \lambda}$. Using this method, we avoid diving by 0 or a very small $\sigma_{min}$. 
+
+Below, we add a $\lambda$ of 0.13 and subsequently reduce the condition number significantly: 
+
+```{r}
+lambda <- 0.1307055
+svals <- svd(X)$d
+(max(svals) +  lambda) / (min(svals) + lambda)
+```
+
+##5. The LASSO Penalty
+
+**Consider the LASSO penalty:**
+$$
+\frac{1}{2n} ||Y - X \beta||^2_2 + \lambda ||\beta||_1
+$$
+**Show that if $|X_j^T| \le n \lambda$, then $\hat{\beta}^{LASSO}$ must be zero.**
+Here, we assume that the predictors in X are indpendent such that $||X||_2^2 = I$.
+
+$$
+\text{For } \beta > 0: \frac{1}{2n} ||Y - X \beta||^2_2 + \lambda ||\beta||_1
+$$
+$$ 
+\frac{dl}{d\beta} = \frac{1}{n} (-X')(Y - X \beta) + \lambda = 0
+$$
+$$
+= (-X')(Y - X \beta) + n\lambda = 0
+$$
+$$
+-X'Y + X'X \beta + n\lambda = 0
+$$
+$$
+X'X \beta = X'Y - n\lambda
+$$
+$$
+\beta = (X'X)^{-1}[X'Y - n\lambda] = X'Y - n\lambda
+$$
+Because of the absolute value, we know that for $X_j^T Y - n \lambda < 0$, $\hat{\beta}^{LASSO}$ must be zero.

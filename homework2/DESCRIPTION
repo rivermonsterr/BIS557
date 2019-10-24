@@ -1,0 +1,22 @@
+Description: 
+Package: homework2
+Type: Package
+Title: Ridge Regression + Cross Validation
+Version: 0.1.0
+Author: Christina Harden
+Maintainer: christina.harden@yale.edu
+Description: This package runs a ridge regression and cross validation (though it fails all tests!). 
+    It includes a series of vinettes to further supplement the answers to assignment questions.
+    This package cites code from class documents, the textbook, and classmates Emma Allen and Will Duke. 
+    Special thanks to Chang for all her help! 
+    
+    Re-installing R solved a lot of my devtool difficulties, but I'm still encountering some issues and for that I apologize. 
+License: R version 3.6.1
+Encoding: UTF-8
+LazyData: true
+Suggests: 
+    testthat,
+    knitr,
+    rmarkdown
+RoxygenNote: 6.1.1
+VignetteBuilder: knitr
